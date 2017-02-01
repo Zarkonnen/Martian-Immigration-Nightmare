@@ -1,0 +1,1348 @@
+<!DOCTYPE html>
+<html style="margin: 0; padding: 0;">
+    <head>
+        <title>Martian Immigration Nightmare</title>
+        <script src="jquery-3.1.1.min.js"></script>
+        <script src="howler.min.js"></script>
+    </head>
+    <body style="margin: 0; padding: 0; background: #cde6f4;">
+        <canvas width="800" height="600" allowfullscreen="true" id="gameCanvas" style="margin: 0;"></canvas>
+        <script>
+/*
+Dear Mr. Musk,
+
+I'm putting this in here because I know you're the kind of person who might
+actually look at the source code.
+
+First off, I know I'm singling you out with this game. I'm doing this because
+I believe you want to do the right thing. I have no such hopes about people
+like Trump and Bannon, which is why they're not getting a game made for them.
+
+You want to go to Mars. This is an amazing and noble goal, and I support you
+in it.
+
+The people currently in limbo or detained at US airports want to get home, to
+their family, their job, their car, their cat. Trump's order is causing vast
+suffering. I know the order's text is not as bad as it seems, but the text
+hardly matters when government officials are zealously interpreting its
+intent in the most cruel fashion.
+
+You were very critical of Trump initially, and I assume you joined his
+advisory council hoping to keep the worst in check. That is not working.
+Officials are ignoring court rulings, Trump is re-shuffling the national
+security council, the checks and balances of US democracy are straining and
+breaking.
+
+I also assume that, like most people, you believe that you would do the right
+thing in a moment of crisis. Well, here is that moment.
+
+You have to break with Trump, denounce him, and call on your peers to do the
+same. Otherwise, years down the line, you will look back at this time and
+think: "This was my moment, this was when it really came down to me, and I
+missed it."
+
+Regards,
+
+David Stark
+*/
+
+function hwl(name, volume) {
+    return new Howl({src: ["sounds/" + name + ".ogg", "sounds/" + name + ".mp3", "sounds/" + name + ".wav"], volume: volume || 1});
+}
+
+var sCoin = hwl("coin");
+var sPaper = hwl("paper", 0.3);
+var sRocket = hwl("rocket");
+
+var splash = true;
+var dedication = true;
+var globalTime = 0;
+var prevDirty = true;
+var dirty = false;
+var hover = "";
+var prevHover = "";
+
+var askedForLawyer = false;
+var gotoFloorB = false;
+var redCardTaken = false;
+var gotoFloorC = false;
+var gotoFloorBAgain = false;
+var items = ["phone", "creditcard", "redcard"];
+var needCoins = false;
+var haveCoins = false;
+var phoneBroken = false;
+var phoneBrokenReported = false;
+var takeoff = false; // You will not go to space today.
+var takeoffProgress = 0;
+
+var itemInfo = {
+    phone: "Your mobile phone. There's no signal in the spaceport.",
+    creditcard: "Your credit card, Mars-ready.",
+    redcard: "Your Red Card clearing you for Martian immigration.",
+    form: "A signed form I-616.",
+    coins: "A few coins. Enough to make a call."
+};
+
+function statusBoard(dy) {
+    dy = dy || 0;
+    c.font = "50px sans-serif";
+    if (takeoff) {
+        c.fillStyle = "#aaaaff";
+        if (Math.ceil(globalTime / 800) % 2 == 0) {
+            c.fillText("LAUNCHING", 1650 - 711, 850 - 500 + dy);
+        }
+    } else if (gotoFloorBAgain) {
+        c.fillStyle = "#ff5555";
+        if (Math.ceil(globalTime / 800) % 2 == 0) {
+            c.fillText("FINAL CALL", 1650 - 711, 850 - 500 + dy);
+        }
+    } else if (gotoFloorC) {
+        c.fillStyle = "#ff7777";
+        c.fillText("LAST CALL", 1650 - 711, 850 - 500 + dy);
+    } else {
+        c.fillStyle = "#ffff77";
+        c.fillText("BOARDING", 1650 - 711, 850 - 500 + dy);
+    }
+}
+
+var places = {
+    outro: {
+        interaction: "outro",
+        background: "bgSky",
+        extraDraw: function() {
+            img("rocket", 550 + 400, 200);
+            if (takeoffProgress > 0) {
+                img("thrust", 580 + 400, 200 + 572);
+                var sz = 100 + Math.random() * 30;
+                c.fillStyle = "rgba(255, 252, 232, 0.7)";
+                c.beginPath();
+                c.arc(600 + 400, 800, sz, 0, 2 * Math.PI, false);
+                c.fill();
+                c.fillStyle = "white";
+                c.beginPath();
+                c.arc(600 + 400, 800, sz / 2, 0, 2 * Math.PI, false);
+                c.fill();
+            }
+        }
+    },
+    mainHall: {
+        background: "bgSky",
+        interaction: null,
+        clickAreas: [
+            {
+                x: 930,
+                y: 495,
+                w: 722,
+                h: 420,
+                to: "checkInQueue"
+            },
+            {
+                x: 744 - 711,
+                y: 998 - 500,
+                w: 251,
+                h: 363,
+                to: "mainHallElevator"
+            }
+        ],
+        extraDraw: function(ms) {
+            if (takeoffProgress > 0 && takeoffProgress <= 5000) {
+                c.translate((Math.random() * 4000 - 2000) / (takeoffProgress + 50), (Math.random() * 4000 - 2000) / (takeoffProgress + 50));
+            }
+            var lookUp = Math.min(300, takeoffProgress * takeoffProgress * 0.00001);
+            if (takeoffProgress > 5000) {
+                lookUp = 0;
+                if (!node && takeoffProgress > 5500) {
+                    node = interactions.postTakeoff;
+                }
+            }
+            img("cloudy_sky", -711, -500 + lookUp);
+            img("ramp", 620 + (takeoff ? 100 : 0), 260 + lookUp);
+            img("rocket", 550, 200 - takeoffProgress * takeoffProgress * 0.00002 + lookUp);
+            if (takeoffProgress > 0) {
+                img("thrust", 580, 200 + 572 - takeoffProgress * takeoffProgress * 0.00002 + lookUp);
+                var sz = 100 + Math.random() * 30;
+                c.fillStyle = "rgba(255, 252, 232, 0.7)";
+                c.beginPath();
+                c.arc(600, 800 - takeoffProgress * takeoffProgress * 0.00002 + lookUp, sz, 0, 2 * Math.PI, false);
+                c.fill();
+                c.fillStyle = "white";
+                c.beginPath();
+                c.arc(600, 800 - takeoffProgress * takeoffProgress * 0.00002 + lookUp, sz / 2, 0, 2 * Math.PI, false);
+                c.fill();
+            }
+            img("hallA", -711, -500 + lookUp);
+            img("aDesk", 950, 500 + lookUp);
+            if (!takeoff) {
+                img("aQueue", 1100, 500 + lookUp);
+            }
+            if (takeoffProgress > 5000) {
+                img("police", 700, 200);
+            }
+            if (takeoffProgress == 0) {
+                statusBoard(0);
+            }
+        }
+    },
+    mainHallElevator: {
+        background: "aElevator",
+        interaction: "mainHallElevator"
+    },
+    checkInQueue: {
+        background: "aQueue2",
+        interaction: "checkInQueue"
+    },
+    checkInDesk: {
+        background: "aDesk2",
+        interactionF: function() {
+            if (takeoff) {
+                return "checkInDeskTakeoff";
+            }
+            if (gotoFloorB) {
+                return "checkInDeskGotoFloorB";
+            }
+            return "checkInDocs";
+        }
+    },
+    floorB: {
+        background: "hallB",
+        clickAreas: [
+            {
+                x: 1398 - 711,
+                y: 764 - 500,
+                w: 884,
+                h: 544,
+                to: "floorBQueue"
+            },
+            {
+                x: 744 - 711,
+                y: 765 - 500,
+                w: 251,
+                h: 363,
+                to: "floorBElevator"
+            }
+        ],
+        extraDraw: function() { statusBoard(-200); }
+    },
+    floorBQueue: {
+        background: "bQueue",
+        interaction: "floorBQueue",
+    },
+    floorBDesk: {
+        background: "bDesk",
+        interactionF: function() {
+            if (!gotoFloorB) {
+                return "floorBDeskTooEarly";
+            }
+            if (gotoFloorBAgain) {
+                return "floorBRedux";
+            }
+            if (gotoFloorC) {
+                return "floorBDeskGotoFloorC";
+            }
+            if (redCardTaken) {
+                return "floorBHubNoRedCard";
+            }
+            return "floorBDesk";
+        },
+        extraDraw: function() {
+            c.translate(-1940, -600);
+            c.scale(2, 2);
+            statusBoard();
+            reset();
+        }
+    },
+    floorBElevator: {
+        background: "bElevator",
+        interaction: "floorBElevator"
+    },
+    floorC: {
+        background: "floorC",
+        clickAreas: [
+            {
+                x: 1326 - 711,
+                y: 794 - 500,
+                w: 872,
+                h: 544,
+                to: "floorCQueue"
+            },
+            {
+                x: 744 - 711,
+                y: 798 - 500,
+                w: 251,
+                h: 363,
+                to: "floorCElevator"
+            }
+        ],
+        extraDraw: function() { statusBoard(-200); }
+    },
+    floorCQueue: {
+        background: "cQueue",
+        interaction: "floorCQueue",
+    },
+    floorCDesk: {
+        background: "cDesk",
+        interactionF: function() {
+            if (!gotoFloorC) {
+                return "floorCDeskTooEarly";
+            }
+            if (gotoFloorBAgain) {
+                return "floorCDeskGotoFloorBAgain";
+            }
+            return "floorCDesk";
+        },
+        extraDraw: function() {
+            c.translate(-1855, -670);
+            c.scale(2, 2);
+            statusBoard();
+            reset();
+        }
+    },
+    floorCElevator: {
+        background: "cElevator",
+        interaction: "floorCElevator"
+    },
+    floorD: {
+        background: "floorD",
+        clickAreas: [
+            {
+                x: 1375 - 711,
+                y: 976 - 500,
+                w: 178,
+                h: 300,
+                to: "payPhone"
+            },
+            {
+                x: 744 - 711,
+                y: 798 - 500,
+                w: 251,
+                h: 363,
+                to: "floorDElevator"
+            },
+            {
+                x: 1212 - 711,
+                y: 998 - 500,
+                w: 150,
+                h: 150,
+                to: "floorDPerson1"
+            },
+            {
+                x: 1578 - 711,
+                y: 972 - 500,
+                w: 150,
+                h: 150,
+                to: "floorDPerson2"
+            },
+            {
+                x: 1770 - 711,
+                y: 828 - 500,
+                w: 150,
+                h: 150,
+                to: "floorDPerson3"
+            }
+        ],
+        extraDraw: function() { statusBoard(-200); }
+    },
+    
+    floorDPerson1: {
+        background: "floorD",
+        interaction: "person1",
+        extraDraw: function() { statusBoard(-200); }
+    },
+    
+    floorDPerson2: {
+        background: "floorD",
+        interaction: "person2",
+        extraDraw: function() { statusBoard(-200); }
+    },
+    
+    floorDPerson3: {
+        background: "floorD",
+        interaction: "person3",
+        extraDraw: function() { statusBoard(-200); }
+    },
+    
+    payPhone: {
+        background: "dPhone",
+        interaction: "payPhone"
+    },
+    floorDElevator: {
+        background: "dElevator",
+        interaction: "floorDElevator"
+    },
+};
+
+var interactions = {
+    outro: {
+        text: "Martian Immigration Nightmare, 2017",
+        options: [
+            {
+                name: "Restart",
+                chosen: function() {
+                    askedForLawyer = false;
+                    gotoFloorB = false;
+                    redCardTaken = false;
+                    gotoFloorC = false;
+                    gotoFloorBAgain = false;
+                    items = ["phone", "creditcard", "redcard"];
+                    needCoins = false;
+                    haveCoins = false;
+                    phoneBroken = false;
+                    phoneBrokenReported = false;
+                    takeoff = false;
+                    place = places.mainHall;
+                    node = place.interaction;
+                    textOverride = null;
+                    takeoffProgress = 0;
+                }
+            }
+        ]
+    },
+    checkInQueue: {
+        text: "You're queuing for the Mars rocket check-in desk.",
+        options: [{ name: "OK", place: "checkInDesk" }]
+    },
+    checkInDocs: {
+        text: "\"Hi! Could I please have your documents?\"",
+        options: [
+            {
+                name: "Give her your Red Card",
+                to: "checkInDeskHub",
+                chosen: function() { sPaper.play(); }
+            }
+        ]
+    },
+    checkInDeskHub: {
+        text: "\"Oh, I'm so sorry, but that's not valid anymore.\"",
+        image: "redcard-big",
+        options: [
+            {
+                name: "\"What? Why is it not valid?\"",
+                text: "\"New directive came down this morning. Stricter immigration checks.\""
+            },
+            {
+                name: "\"What do I need to do?\"",
+                text: "\"If you go down to floor B, they should be able to help you.\"",
+                chosen: function() { gotoFloorB = true; }
+            },
+            {
+                name: "\"But this is a valid Red Card!\"",
+                text: "\"I'm afraid I can't help you there, sir. Orders straight from the President.\""
+            },
+            {
+                name: "\"But this is crazy!\"",
+                text: "\"Sir. You are acting in a threatening fashion. Please leave.\""
+            },
+            {
+                name: "\"Is there a phone somewhere?\"",
+                active: function() { return askedForLawyer && !phoneBroken; },
+                text: "\"There's a pay phone on floor D.\""
+            },
+            {
+                name: "\"The phone on Floor D is broken.\"",
+                active: function() { return phoneBroken && !phoneBrokenReported; },
+                text: "\"Oh right. I'll tell maintenance, thanks.\"",
+                chosen: function() { phoneBrokenReported = true; }
+            },
+            {
+                name: "\"How can I call my lawyer if the only phone doesn't work?\"",
+                active: function() { return askedForLawyer && phoneBrokenReported; },
+                text: "\"Sorry, I can't help you with that. I have work to do.\""
+            },
+            {
+                name: "\"How do I get to another floor?\"",
+                active: function() { return gotoFloorB; },
+                text: "\"There's an elevator.\""
+            },
+            { name: "Leave", place: "mainHall" }
+        ]
+    },
+    checkInDeskGotoFloorB: {
+        text: "\"You should go to Floor B. They might be able to help with your card.\"",
+        options: [
+            {
+                name: "\"Is there a phone somewhere?\"",
+                active: function() { return askedForLawyer; },
+                text: "\"There's a pay phone on floor D.\""
+            },
+            {
+                name: "\"How do I get to another floor?\"",
+                active: function() { return gotoFloorB; },
+                text: "\"There's an elevator.\""
+            },
+            {
+                name: "\"I want my lawyer!\"",
+                text: "\"Of course you are free to call your lawyer.\"",
+                chosen: function() { askedForLawyer = true; }
+            },
+            {
+                name: "\"Do you have any coins?\"",
+                active: function() { return needCoins; },
+                text: "\"I don't. You are holding up the queue.\""
+            },
+            {
+                name: "\"The phone on Floor D is broken.\"",
+                active: function() { return phoneBroken && !phoneBrokenReported; },
+                text: "\"Oh right. I'll tell maintenance, thanks.\"",
+                chosen: function() { phoneBrokenReported = true; }
+            },
+            {
+                name: "\"How can I call my lawyer if the only phone doesn't work?\"",
+                active: function() { return askedForLawyer && phoneBrokenReported; },
+                text: "\"Sorry, I can't help you with that. I have work to do.\""
+            },
+            { name: "Leave", place: "mainHall" }
+        ]
+    },
+    checkInDeskTakeoff: {
+        text: "\"Check-in is closed.\"",
+        options: [
+            {
+                name: "\"Is there a phone somewhere?\"",
+                active: function() { return askedForLawyer; },
+                text: "\"There's a pay phone on floor D.\""
+            },
+            {
+                name: "\"How do I get to another floor?\"",
+                active: function() { return gotoFloorB; },
+                text: "\"There's an elevator.\""
+            },
+            {
+                name: "\"I want my lawyer!\"",
+                text: "\"Of course you are free to call your lawyer.\"",
+                chosen: function() { askedForLawyer = true; }
+            },
+            {
+                name: "\"Do you have any coins?\"",
+                active: function() { return needCoins; },
+                text: "\"I don't. Please stop bothering me.\""
+            },
+            { name: "Leave", place: "mainHall" }
+        ]
+    },
+    mainHallElevator: {
+        options: [
+            { name: "Floor B", place: "floorB" },
+            { name: "Floor C", place: "floorC" },
+            { name: "Floor D", place: "floorD" },
+            { name: "Leave", place: "mainHall" }
+        ]
+    },
+    floorBQueue: {
+        text: "You're queuing for the Mars rocket info desk.",
+        options: [{ name: "OK", place: "floorBDesk" }]
+    },
+    floorBDesk: {
+        text: "\"Your papers, please.\"",
+        options: [
+            {
+                name: "Give him your Red Card",
+                to: "floorBQ1",
+                chosen: function() {
+                    sPaper.play();
+                    redCardTaken = true;
+                    items.splice(items.indexOf("redcard"), 1);
+                }
+            }
+        ]
+    },
+    floorBQ1: {
+        text: "\"Can you confirm that the statements on here are truthful?\"",
+        options: [{ name: "\"Yes\"", to: "floorBQ2" }]
+    },
+    floorBQ2: {
+        text: "\"Are you carrying any medications, metal items, or sharp objects?\"",
+        options: [{ name: "\"No\"", to: "floorBQ3" }]
+    },
+    floorBQ3: {
+        text: "\"What do you think of the President, by the way?\"",
+        options: [
+            { name: "\"Uh, what?\"", to: "floorBHmm" },
+            { name: "\"He's great!\"", to: "floorBHmm" },
+            { name: "\"I don't like him very much.\"", to: "floorBHmm" },
+            { name: "\"I prefer not to say.\"", to: "floorBHmm" }
+        ]
+    },
+    floorBHmm: {
+        text: "\"Hmm...\"",
+        options: [{ name: "Wait", to: "floorBHub" }]
+    },
+    floorBHub: {
+        text: "\"Yeah, that card's not valid anymore.\"",
+        options: [
+            {
+                name: "\"But I need to get to Mars!\"",
+                text: "\"That's not my problem. You should have turned up with a valid card.\""
+            },
+            {
+                name: "\"What can I do to get on that rocket?\"",
+                text: "\"You should go to the desk on floor C for re-processing.\"",
+                chosen: function() { gotoFloorC = true; }
+            },
+            {
+                name: "\"You can't do this!\"",
+                text: "\"Don't threaten me, or I will call security.\""
+            },
+            {
+                name: "\"I want my lawyer!\"",
+                text: "\"Of course you are free to call your lawyer.\"",
+                chosen: function() { askedForLawyer = true; }
+            },
+            {
+                name: "\"Is there a phone somewhere?\"",
+                active: function() { return askedForLawyer && !phoneBroken; },
+                text: "\"There's a pay phone on floor D.\""
+            },
+            {
+                name: "\"The phone on Floor D is broken.\"",
+                active: function() { return phoneBroken && !phoneBrokenReported; },
+                text: "\"Oh yeah. It will be fixed over the weekend, I think.\"",
+                chosen: function() { phoneBrokenReported = true; }
+            },
+            {
+                name: "\"How can I call my lawyer if the only phone doesn't work?\"",
+                active: function() { return askedForLawyer && phoneBrokenReported; },
+                text: "\"You wouldn't need a lawyer if you turned up with a valid card.\""
+            },
+            { name: "Leave", place: "floorB" }
+        ]
+    },
+    floorBHubNoRedCard: {
+        text: "\"How can I help you?\"",
+        options: [
+            {
+                name: "\"Can I have my Red Card back?\"",
+                text: "\"No. It's invalid.\""
+            },
+            {
+                name: "\"I need to get to Mars!\"",
+                text: "\"That's not my problem. You should have turned up with a valid card.\""
+            },
+            {
+                name: "\"What can I do to get on that rocket?\"",
+                text: "\"You should go to the desk on floor C for re-processing.\"",
+                chosen: function() { gotoFloorC = true; }
+            },
+            {
+                name: "\"You can't do this!\"",
+                text: "\"Don't threaten me, or I will call security.\""
+            },
+            {
+                name: "\"I want my lawyer!\"",
+                text: "\"Of course you are free to call your lawyer.\"",
+                chosen: function() { askedForLawyer = true; }
+            },
+            {
+                name: "\"Is there a phone somewhere?\"",
+                active: function() { return askedForLawyer && !phoneBroken; },
+                text: "\"There's a pay phone on floor D.\""
+            },
+            {
+                name: "\"The phone on Floor D is broken.\"",
+                active: function() { return phoneBroken && !phoneBrokenReported; },
+                text: "\"Oh yeah. It will be fixed over the weekend, I think.\"",
+                chosen: function() { phoneBrokenReported = true; }
+            },
+            {
+                name: "\"How can I call my lawyer if the only phone doesn't work?\"",
+                active: function() { return askedForLawyer && phoneBrokenReported; },
+                text: "\"You wouldn't need a lawyer if you turned up with a valid card.\""
+            },
+            { name: "Leave", place: "floorB" }
+        ]
+    },
+    floorBDeskGotoFloorC: {
+        text: "\"You should go to the desk on floor C for re-processing.\"",
+        options: [
+            {
+                name: "\"Can I have my Red Card back?\"",
+                text: "\"No. It's invalid.\""
+            },
+            {
+                name: "\"But I need to get to Mars!\"",
+                text: "\"That's not my problem. You should have turned up with a valid card.\""
+            },
+            {
+                name: "\"You can't do this!\"",
+                text: "\"Don't threaten me, or I will call security.\""
+            },
+            {
+                name: "\"I want my lawyer!\"",
+                text: "\"Of course you are free to call your lawyer.\"",
+                chosen: function() { askedForLawyer = true; }
+            },
+            {
+                name: "\"Is there a phone somewhere?\"",
+                active: function() { return askedForLawyer && !phoneBroken; },
+                text: "\"There's a pay phone on floor D.\""
+            },
+            {
+                name: "\"Do you have any coins?\"",
+                active: function() { return needCoins; },
+                text: "\"I don't give out money to random people!\""
+            },
+            {
+                name: "\"The phone on Floor D is broken.\"",
+                active: function() { return phoneBroken && !phoneBrokenReported; },
+                text: "\"Oh yeah. It will be fixed over the weekend, I think.\"",
+                chosen: function() { phoneBrokenReported = true; }
+            },
+            {
+                name: "\"How can I call my lawyer if the only phone doesn't work?\"",
+                active: function() { return askedForLawyer && phoneBrokenReported; },
+                text: "\"You wouldn't need a lawyer if you turned up with a valid card.\""
+            },
+            { name: "Leave", place: "floorB" }
+        ]
+    },
+    floorBRedux: {
+        text: "\"Why are you still here? You're not allowed in this facility.\"",
+        options: [
+            {
+                name: "Give him the form",
+                to: "floorBRedux2",
+                chosen: function() {
+                    sPaper.play();
+                }
+            }
+        ]
+    },
+    floorBRedux2: {
+        text: "\"No, this is the wrong form. You're not allowed in this facility.\"",
+        image: "form-big",
+        options: [
+            {
+                name: "\"How can I get my Red Card back?\"",
+                text: "\"You've forfeited your red card. Read the form you signed!\"",
+                chosen: function() { gotoFloorC = true; }
+            },
+            {
+                name: "\"Give me back my Red Card!\"",
+                text: "\"It's been destroyed. We can't give it back to you.\""
+            },
+            {
+                name: "\"I'm sick of this!\"",
+                text: "\"Please calm down, or I will call security.\""
+            },
+            {
+                name: "\"I want my lawyer!\"",
+                text: "\"Of course you are free to call your lawyer.\"",
+                chosen: function() { askedForLawyer = true; }
+            },
+            {
+                name: "\"Is there a phone somewhere?\"",
+                active: function() { return askedForLawyer && !phoneBroken; },
+                text: "\"There's a pay phone on floor D.\""
+            },
+            {
+                name: "\"Do you have any coins?\"",
+                active: function() { return needCoins; },
+                text: "\"Oh, go away.\""
+            },
+            {
+                name: "\"The phone on Floor D is broken.\"",
+                active: function() { return phoneBroken && !phoneBrokenReported; },
+                text: "\"Oh yeah. It will be fixed over the weekend, I think.\"",
+                chosen: function() { phoneBrokenReported = true; }
+            },
+            {
+                name: "\"How can I call my lawyer if the only phone doesn't work?\"",
+                active: function() { return askedForLawyer && phoneBrokenReported; },
+                text: "\"You wouldn't need a lawyer if you turned up with a valid card.\""
+            },
+            {
+                name: "Leave",
+                to: "aboutToLaunch",
+                chosen: function() { takeoff = true; }
+            }
+        ]
+    },
+    floorBDeskTooEarly: {
+        text: "\"The check-in desk is on Floor A.\"",
+        options: [
+            { name: "Leave", place: "floorB" }
+        ]
+    },
+    aboutToLaunch: {
+        text: "\"The rocket's about to launch anyway.\"",
+        options: [
+            { name: "OK", to: "aboutToLaunch2" }
+        ]
+    },
+    aboutToLaunch2: {
+        text: "\"You can probably see the launch from Floor A if you hurry.\"",
+        options: [
+            { name: "OK", place: "floorB" }
+        ]
+    },
+    postTakeoff: {
+        text: "\"We're charging you with attempted illegal entry to Mars.\"",
+        options: [
+            { name: "What?", to: "postTakeoff2" },
+            { name: "You can't be serious!", to: "postTakeoff2" },
+            { name: "I did nothing wrong!", to: "postTakeoff2" }
+        ]
+    },
+    postTakeoff2: {
+        text: "\"You're barred from re-applying for five years.\"",
+        options: [
+            { name: "OK", place: "outro" }
+        ]
+    },
+    floorBElevator: {
+        options: [
+            { name: "Floor A", place: "mainHall" },
+            { name: "Floor C", place: "floorC" },
+            { name: "Floor D", place: "floorD" },
+            { name: "Leave", place: "floorB" }
+        ]
+    },
+    floorCQueue: {
+        text: "You're queuing for the Mars immigration desk.",
+        options: [{ name: "OK", place: "floorCDesk" }]
+    },
+    floorCDesk: {
+        text: "\"How can I help you?\"",
+        options: [
+            { name: "\"My Red Card's been declared invalid.\"", to: "floorCInvalid" },
+        ]
+    },
+    floorCInvalid: {
+        text: "\"I see.\"",
+        options: [
+            { name: "Wait", to: "floorCInvalid2" },
+        ]
+    },
+    floorCInvalid2: {
+        text: "\"Can you explain why you entered the spaceport using an invalid Red Card?\"",
+        options: [
+            { name: "\"But it was valid!\"", to: "floorCSignHere" },
+            { name: "\"I didn't know it was invalid.\"", to: "floorCSignHere" }
+        ]
+    },
+    floorCSignHere: {
+        text: "\"That doesn't matter. Please sign this form here.\"",
+        options: [
+            { name: "\"What's the form?\"", text: "\"It will make the process easier. Please sign it.\"" },
+            { name: "\"What if I refuse?\"", text: "\"I can't help you if you won't sign the form.\"" },
+            {
+                name: "\"I want my lawyer!\"",
+                text: "\"Of course you are free to call your lawyer.\"",
+                chosen: function() { askedForLawyer = true; }
+            },
+            {
+                name: "\"Is there a phone somewhere?\"",
+                active: function() { return askedForLawyer && !phoneBroken; },
+                text: "\"There's a pay phone on floor D.\""
+            },
+            {
+                name: "\"The phone on Floor D is broken.\"",
+                active: function() { return phoneBroken && !phoneBrokenReported; },
+                text: "\"Did you break it?\"",
+                chosen: function() { phoneBrokenReported = true; }
+            },
+            {
+                name: "\"How can I call my lawyer if the only phone doesn't work?\"",
+                active: function() { return askedForLawyer && phoneBrokenReported; },
+                text: "\"That is really none of my business. Go away.\""
+            },
+            {
+                name: "Sign the form",
+                to: "floorCFormSigned",
+                chosen: function() {
+                    sPaper.play();
+                    items.push("form");
+                    gotoFloorBAgain = true;
+                }
+            },
+            { name: "Leave", place: "floorC" }
+        ]
+    },
+    floorCDeskGotoFloorBAgain: {
+        text: "\"If you take the form back up to floor B, you can now re-apply.\"",
+        options: [
+            {
+                name: "\"I want my lawyer!\"",
+                text: "\"Of course you are free to call your lawyer.\"",
+                chosen: function() { askedForLawyer = true; }
+            },
+            {
+                name: "\"Is there a phone somewhere?\"",
+                active: function() { return askedForLawyer && !phoneBroken; },
+                text: "\"There's a pay phone on floor D.\""
+            },
+            {
+                name: "\"Do you have any coins?\"",
+                active: function() { return needCoins; },
+                text: "\"Begging is a crime in this spaceport. Please leave or you will be arrested.\""
+            },
+            {
+                name: "\"The phone on Floor D is broken.\"",
+                active: function() { return phoneBroken && !phoneBrokenReported; },
+                text: "\"Did you break it?\"",
+                chosen: function() { phoneBrokenReported = true; }
+            },
+            {
+                name: "\"How can I call my lawyer if the only phone doesn't work?\"",
+                active: function() { return askedForLawyer && phoneBrokenReported; },
+                text: "\"That is really none of my business. Go away.\""
+            },
+            { name: "Leave", place: "floorC" }
+        ]
+    },
+    floorCFormSigned: {
+        text: "\"If you take the form back up to floor B, you can now re-apply.\"",
+        options: [
+            { name: "Leave", place: "floorC" }
+        ]
+    },
+    floorCDeskTooEarly: {
+        text: "\"The check-in desk is on Floor A.\"",
+        options: [
+            { name: "Leave", place: "floorC" }
+        ]
+    },
+    floorCElevator: {
+        options: [
+            { name: "Floor A", place: "mainHall" },
+            { name: "Floor B", place: "floorB" },
+            { name: "Floor D", place: "floorD" },
+            { name: "Leave", place: "floorC" }
+        ]
+    },
+    payPhone: {
+        text: "You find a pay phone.",
+        options: [
+            {
+                name: "Pay with card",
+                text: "The phone only accepts coins.",
+                chosen: function() {
+                    if (!haveCoins) {
+                        needCoins = true;
+                    }
+                }
+            },
+            {
+                name: "Pay with coins",
+                text: "You have no cash on you.",
+                active: function() { return !haveCoins; },
+                chosen: function() { needCoins = true; }
+            },
+            {
+                name: "Pay with coins",
+                text: "You put the coins into the phone, which rejects them. It's broken.",
+                active: function() { return haveCoins; },
+                chosen: function() {
+                    sCoin.play();
+                    phoneBroken = true;
+                }
+            },
+            {
+                name: "Check the coin return slot",
+                text: "There are no coins in the return slot.",
+                active: function() { return needCoins; }
+            },
+            { name: "Leave", place: "floorD" }
+        ]
+    },
+    floorDElevator: {
+        options: [
+            { name: "Floor A", place: "mainHall" },
+            { name: "Floor B", place: "floorB" },
+            { name: "Floor C", place: "floorC" },
+            { name: "Leave", place: "floorD" }
+        ]
+    },
+    person1: {
+        text: "\"I've been stuck here for two days!\"",
+        options: [
+            {
+                name: "\"Did they also revoke your Red Card?\"",
+                text: "\"Yeah! It makes no sense. No sense at all.\"",
+                active: function() { return gotoFloorB; }
+            },
+            {
+                name: "\"Do you have any coins?\"",
+                text: "\"Sorry, no. I spent my last cash on food.\"",
+                active: function() { return needCoins; }
+            },
+            { name: "Leave", place: "floorD" }
+        ]
+    },
+    person2: {
+        text: "\"Shush, sweetie. Oh, hi!\"",
+        options: [
+            {
+                name: "\"Did they also revoke your Red Card?\"",
+                text: "\"Yes. We tried so hard, and so long, to get one.\"",
+                active: function() { return gotoFloorB; }
+            },
+            {
+                name: "\"Do you have any coins?\"",
+                text: "\"I only have a credit card, sorry.\"",
+                active: function() { return needCoins; }
+            },
+            { name: "Leave", place: "floorD" }
+        ]
+    },
+    person3: {
+        text: "\"Hello!\"",
+        options: [
+            {
+                name: "\"Did they also revoke your Red Card?\"",
+                text: "\"Mine, yes. Not his. But...\"",
+                active: function() { return gotoFloorB; }
+            },
+            {
+                name: "\"Do you have any coins?\"",
+                text: "\"For the phone? Yes, we have some.\"",
+                active: function() { return needCoins; },
+                chosen: function() {
+                    sCoin.play();
+                    needCoins = false;
+                    haveCoins = true;
+                    items.push("coins");
+                }
+            },
+            { name: "Leave", place: "floorD" }
+        ]
+    }
+};
+
+var place = places.mainHall;
+var node = place.interaction;
+var textOverride = null;
+var scale = 1.0;
+var xShift = 0;
+var yShift = 0;
+
+function tick(ms) {
+    prevDirty |= hover != prevHover || takeoffProgress > 0;
+    prevHover = hover;
+    hover = "";
+    dirty = false;
+    if (takeoff || gotoFloorBAgain) {
+        if (Math.ceil((globalTime - 20) / 800) % 2 != Math.ceil(globalTime / 800) % 2) {
+            dirty = true;
+        }
+    }
+    globalTime += ms;
+    if (prevDirty) {
+        resetTransform();
+        c.font = "60px sans-serif";
+        c.fillStyle = "#cde6f4";
+        c.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    var w = 1500;
+    var h = 1125;
+    reset();
+    var csr = null
+    if (cursor) {
+        csr = {x: (cursor.x - shiftX) / scale, y: (cursor.y - shiftY) / scale};
+    }
+    var clk = null
+    if (click) {
+        clk = {x: (click.x - shiftX) / scale, y: (click.y - shiftY) / scale};
+    }
+    
+    if (splash) {
+        if (prevDirty) {
+            img("introBG", -711, -500);
+            c.font = "80px sans-serif";
+            c.fillStyle = "black";
+            c.fillText("Martian Immigration Nightmare", w / 2 - c.measureText("Martian Immigration Nightmare").width / 2, 200);
+            c.font = "40px sans-serif";
+            c.fillText("Click to start.", w / 2 - c.measureText("Click to start.").width / 2, 900);
+            img("redcard-big", w / 2 - 400, h / 2 - 400);
+        }
+        if (click) {
+            dirty = true;
+            splash = false;
+        }
+        return;
+    }
+    
+    if (dedication) {
+        if (prevDirty) {
+            img("introBG", -711, -500);
+            c.font = "40px sans-serif";
+            c.fillStyle = "black";
+            c.fillText("This game is dedicated to Elon Musk.", w / 2 - c.measureText("This game is dedicated to Elon Musk.").width / 2, 500);
+            
+            c.fillText("Martian Immigration Nightmare by David Stark et al.", w / 2 - c.measureText("Martian Immigration Nightmare by David Stark et al.").width / 2, 400);
+            c.fillText("Click to continue.", w / 2 - c.measureText("Click to continue.").width / 2, 600);
+        }
+        if (click) {
+            dirty = true;
+            dedication = false;
+        }
+        return;
+    }
+    
+    if (place == places.mainHall && takeoff) {
+        if (takeoffProgress == 0) {
+            sRocket.play();
+            takeoffProgress = 1;
+        }
+        takeoffProgress += ms;
+    }
+    
+    if (place.background && prevDirty) {
+        img(place.background, -711, -500);
+    }
+    
+    if (place.extraDraw && prevDirty) {
+        place.extraDraw(ms);
+    }
+    c.font = "40px sans-serif";
+    if (node) {
+        c.fillStyle = "white";
+        c.strokeStyle = "black";
+        c.lineWidth = 4;
+        var y = 150;
+        var maxW = 0;
+        if (node.text) {
+            var t = textOverride || node.text;
+            maxW = Math.max(maxW, c.measureText(t).width);
+        }
+        for (var i = 0; i < node.options.length; i++) {
+            var o = node.options[i];
+            if (o.active && !o.active()) { continue; }
+            maxW = Math.max(maxW, c.measureText(o.name).width + 50);
+        }
+        if (prevDirty) {
+            c.fillStyle = "rgba(0, 0, 0, 0.5)";
+            c.fillRect(-40, -1000, maxW + 130, h + 2000);
+            c.fillStyle = "white";
+            if (node.image) {
+               img(node.image, w / 2, y);
+            }
+            if (node.text) {
+                var t = textOverride || node.text;
+                c.fillText(t, 20, y);
+            }
+        }
+        y += 80;
+        for (var i = 0; i < node.options.length; i++) {
+            var o = node.options[i];
+            if (o.active && !o.active()) { continue; }
+            var tw = c.measureText(o.name).width;
+            if (csr && csr.y > y - 40 && csr.y < y + 10) {
+                hover = o.name;
+                c.fillStyle = "#ffff88";
+                if (click) {
+                    dirty = true;
+                    if (o.place) {
+                        place = places[o.place];
+                        if (place.interactionF) {
+                            node = interactions[place.interactionF()];
+                        } else if (place.interaction) {
+                            node = interactions[place.interaction];
+                        } else {
+                            node = null;
+                        }
+                        textOverride = null;
+                    }
+                    if (o.to) {
+                        node = interactions[o.to];
+                        textOverride = null;
+                    }
+                    if (o.toF) {
+                        node = interactions[o.toF()];
+                        textOverride = null;
+                    }
+                    if (o.text) {
+                        textOverride = o.text;
+                    }
+                    if (o.chosen) {
+                        o.chosen();
+                    }
+                    return;
+                }
+            } else {
+                c.fillStyle = "#bbbbff";
+            }
+            if (prevDirty) {
+                c.fillText(o.name, 70, y);
+            }
+            y += 65;
+        }
+    } else if (place.clickAreas && !(place == places.mainHall && takeoff)) {
+        for (var i = 0; i < place.clickAreas.length; i++) {
+            var ca = place.clickAreas[i];
+            if (csr && csr.x > ca.x && csr.x < ca.x + ca.w && csr.y > ca.y && csr.y < ca.y + ca.h) {
+                hover = "x" + ca.x + "y" + ca.y + "w" + ca.w + "h" + ca.h;
+                if (prevDirty) {
+                    c.fillStyle = "rgba(255, 255, 255, 0.4)";
+                    c.fillRect(ca.x, ca.y, ca.w, ca.h);
+                }
+                if (click) {
+                    dirty = true;
+                    place = places[ca.to];
+                    if (place.interactionF) {
+                        node = interactions[place.interactionF()];
+                    } else if (place.interaction) {
+                        node = interactions[place.interaction];
+                    } else {
+                        node = null;
+                    }
+                    if (ca.chosen) {
+                        ca.chosen();
+                    }
+                    return;
+                }
+            }
+        }
+    }
+    
+    if (takeoffProgress == 0) {
+        var invX = 0;
+        var invY = h - 250;
+        for (var i = 0; i < items.length; i++) {
+            var it = items[i];
+            if (prevDirty) {
+                img(it, invX, invY);
+            }
+            if (!node && csr && csr.x > invX && csr.x < invX + 200 && csr.y > invY && csr.y < invY + 200) {
+                hover = it;
+                if (prevDirty) {
+                    c.fillStyle = "rgba(255, 255, 255, 0.4)";
+                    c.fillRect(invX - 10, invY - 10, 220, 220);
+                }
+                if (click) {
+                    dirty = true;
+                    node = {
+                        image: it + "-big",
+                        text: itemInfo[it],
+                        options: [{ name: "OK", chosen: function() { node = null; } }]
+                    };
+                }
+            }
+            invX += 250;
+        }
+    }
+}
+
+function resetTransform() {
+    c.setTransform(1, 0, 0, 1, 0, 0);
+}
+
+function reset() {
+    resetTransform();
+    // Scale as if screen was always 1500x1125 px.
+    var w = canvas.width;
+    var h = canvas.height;
+    if (w * 3 > h * 4) {
+        // Wide
+        scale = h / 1125.0;
+        shiftX = (w - scale * 1500) / 2;
+        shiftY = 0;
+    } else {
+        // Tall
+        scale = w / 1500.0;
+        shiftX = 0;
+        shiftY = (h - scale * 1125) / 2;
+    }
+    c.translate(shiftX, shiftY);
+    c.scale(scale, scale);
+}
+
+var images = {};
+
+// Preload images
+var imgNames = [
+    "introBG", "redcard-big",
+    "form-big", "phone-big", "creditcard-big", "coins-big",
+    "form", "phone", "redcard", "creditcard", "coins",
+    "bgSky", "cloudy_sky", "rocket", "thrust", "ramp", "aDesk", "aQueue",
+    "hallA", "aDesk2", "aQueue2", "aElevator",
+    "hallB", "bQueue", "bDesk", "bElevator",
+    "floorC", "cQueue", "cDesk", "cElevator",
+    "floorD", "dPhone", "dElevator",
+    "police"
+];
+
+for (var i = 0; i < imgNames.length; i++) {
+    var imgN = imgNames[i];
+    images[imgN] = new Image();
+    images[imgN].src = "graphics/" + imgN + ".png";
+}
+
+function img(img, x, y) {
+    if (img == null) { return; }
+    if (!images[img]) {
+        console.log("Missing " + img);
+        images[img] = new Image();
+        images[img].src = "graphics/" + img + ".png";
+    }
+    if (!images[img].complete || images[img].naturalWidth === 0) {
+        dirty = true;
+    } else {
+        c.drawImage(images[img], x, y);
+    }
+}
+
+var canvas = document.getElementById("gameCanvas");
+var c = canvas.getContext("2d");
+var click = null;
+var mouseDown = false;
+var cursor = {x: 300, y: 300};
+
+// Listen for key presses.
+function canvasKeyUp(e) {
+    keyCodes[e.which] = true;
+    keys[String.fromCharCode(e.which)] = true;
+}
+
+// Listen for mouse stuff.
+function canvasClick(e) {
+    click = { "x": e.offsetX, "y": e.offsetY };
+}
+
+function canvasMouseDown(e) {
+    mouseDown = true;
+}
+
+function canvasMouseUp(e) {
+    mouseDown = false;
+}
+
+function canvasMove(e) {
+    cursor = { "x": e.offsetX, "y": e.offsetY };
+}
+
+$('#gameCanvas').click(canvasClick).mousemove(canvasMove).mousedown(canvasMouseDown).mouseup(canvasMouseUp);
+
+// Set up game loop.
+var requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
+var lastUpdate = new Date().getTime();
+
+function nextFrame() {
+    var currentTime = new Date().getTime();
+    tick(currentTime - lastUpdate);
+    prevDirty = dirty;
+    dirty = false;
+    keys = {};
+    keyCodes = {};
+    click = null;
+    lastUpdate = currentTime;
+    requestAnimationFrame(nextFrame);
+}
+
+// Once everything is set up, start game loop.
+requestAnimationFrame(nextFrame);
+
+jQuery(window).resize(function() {
+    canvas.width = window.innerWidth - 8;
+    canvas.height = window.innerHeight - 8;
+    dirty = true;
+    prevDirty = true;
+});
+jQuery(window).ready(function() {
+    canvas.width = window.innerWidth - 8;
+    canvas.height = window.innerHeight - 8;
+    dirty = true;
+    prevDirty = true;
+});
+        </script>
+    </body>
+</html>
