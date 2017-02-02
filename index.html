@@ -93,12 +93,12 @@ var musics = [
     },
     {
         volume: function() {
-            if (takeoffProgress > 0) { return 1.0; }
+            if (takeoffProgress > 0) { return 0.9; }
             if (takeoff) { return 0.01; }
             if (gotoFloorBAgain) { return 0.2; }
             if (gotoFloorC) { return 0.01; }
             if (gotoFloorB) { return 0.2; }
-            return 0.7;
+            return 0.6;
         },
         currentVolume: 0.0001,
         howl: hwl("song", 0.0001)
@@ -130,9 +130,9 @@ var musics = [
     {
         volume: function() {
             if (takeoffProgress > 0) { return 0.0000001; }
-            if (takeoff) { return 0.2; }
+            if (takeoff) { return 0.05; }
             if (gotoFloorBAgain) { return 0.0001; }
-            if (gotoFloorC) { return 0.2; }
+            if (gotoFloorC) { return 0.05; }
             if (gotoFloorB) { return 0.01; }
             return 0.0001;
         },
@@ -227,14 +227,6 @@ var places = {
             c.beginPath();
             c.arc(600 + 400, 800, sz / 2, 0, 2 * Math.PI, false);
             c.fill();
-            img("tweetbutton", 1100, 450);
-            if (csr && csr.x > 1100 && csr.x < 1100 + 152 && csr.y > 450 && csr.y < 450 + 56) {
-                c.fillStyle = "rgba(255, 255, 255, 0.4)";
-                c.fillRect(1100, 450, 152, 56);
-                if (click) {
-                    window.location.href = "https://twitter.com/intent/tweet?hashtags=MuslimBanProtest&ref_src=twsrc%5Etfw&text=Martian%20Immigration%20Nightmare%2C%20a%20web%20game%20made%20specifically%20for%20Elon%20Musk.&tw_p=tweetbutton&url=https%3A%2F%2Fzarkonnen.itch.io%2Fmartian-immigration-nightmare";
-                }
-            }
         }
     },
     mainHall: {
@@ -1375,7 +1367,7 @@ var imgNames = [
     "hallB", "bQueue", "bDesk", "bElevator",
     "floorC", "cQueue", "cDesk", "cElevator",
     "floorD", "dPhone", "dElevator",
-    "police", "tweetbutton"
+    "police"
 ];
 
 for (var i = 0; i < imgNames.length; i++) {
