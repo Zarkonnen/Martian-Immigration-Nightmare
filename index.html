@@ -54,6 +54,112 @@ var sCoin = hwl("coin");
 var sPaper = hwl("paper", 0.3);
 var sRocket = hwl("rocket");
 
+var musics = [
+    {
+        volume: function() {
+            if (takeoffProgress > 0) { return 0.15; }
+            if (takeoff) { return 0.15; }
+            if (gotoFloorBAgain) { return 0.45; }
+            if (gotoFloorC) { return 0.5; }
+            if (gotoFloorB) { return 0.3; }
+            return 0.0001;
+        },
+        currentVolume: 0.0001,
+        howl: hwl("beat", 0.0001)
+    },
+    {
+        volume: function() {
+            if (takeoffProgress > 0) { return 0.1; }
+            if (takeoff) { return 0.01; }
+            if (gotoFloorBAgain) { return 0.01; }
+            if (gotoFloorC) { return 0.2; }
+            if (gotoFloorB) { return 0.6; }
+            return 0.1;
+        },
+        currentVolume: 0.0001,
+        howl: hwl("hum", 0.0001)
+    },
+    {
+        volume: function() {
+            if (takeoffProgress > 0) { return 0.1; }
+            if (takeoff) { return 0.01; }
+            if (gotoFloorBAgain) { return 0.01; }
+            if (gotoFloorC) { return 0.2; }
+            if (gotoFloorB) { return 0.6; }
+            return 0.1;
+        },
+        currentVolume: 0.0001,
+        howl: hwl("humb", 0.0001)
+    },
+    {
+        volume: function() {
+            if (takeoffProgress > 0) { return 1.0; }
+            if (takeoff) { return 0.01; }
+            if (gotoFloorBAgain) { return 0.2; }
+            if (gotoFloorC) { return 0.01; }
+            if (gotoFloorB) { return 0.2; }
+            return 0.7;
+        },
+        currentVolume: 0.0001,
+        howl: hwl("song", 0.0001)
+    },
+    {
+        volume: function() {
+            if (takeoffProgress > 0) { return 0.03; }
+            if (takeoff) { return 0.0001; }
+            if (gotoFloorBAgain) { return 0.0001; }
+            if (gotoFloorC) { return 0.0001; }
+            if (gotoFloorB) { return 0.0001; }
+            return 0.1;
+        },
+        currentVolume: 0.0001,
+        howl: hwl("chimes", 0.0001)
+    },
+    {
+        volume: function() {
+            if (takeoffProgress > 0) { return 0.25; }
+            if (takeoff) { return 0.3; }
+            if (gotoFloorBAgain) { return 0.25; }
+            if (gotoFloorC) { return 0.05; }
+            if (gotoFloorB) { return 0.01; }
+            return 0.0001;
+        },
+        currentVolume: 0.0001,
+        howl: hwl("bathub", 0.0001)
+    },
+    {
+        volume: function() {
+            if (takeoffProgress > 0) { return 0.0000001; }
+            if (takeoff) { return 0.2; }
+            if (gotoFloorBAgain) { return 0.0001; }
+            if (gotoFloorC) { return 0.2; }
+            if (gotoFloorB) { return 0.01; }
+            return 0.0001;
+        },
+        currentVolume: 0.0001,
+        howl: hwl("beat2", 0.0001)
+    }
+];
+
+function startMusic() {
+    for (var i = 0; i < musics.length; i++) {
+        var m = musics[i];
+        m.howl.loop(true);
+        m.howl.play();
+    }
+}
+
+function manageMusic() {
+    for (var i = 0; i < musics.length; i++) {
+        var m = musics[i];
+        var vol = m.volume();
+        if (vol != m.currentVolume) {
+            m.howl.fade(m.currentVolume, vol, 2000);
+            m.currentVolume = vol;
+        }
+    }
+}
+
 var splash = true;
 var dedication = true;
 var globalTime = 0;
@@ -1065,9 +1171,12 @@ function tick(ms) {
         if (click) {
             dirty = true;
             splash = false;
+            startMusic();
         }
         return;
     }
+    
+    manageMusic();
     
     if (dedication) {
         if (prevDirty) {
