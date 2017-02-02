@@ -111,17 +111,23 @@ var places = {
         background: "bgSky",
         extraDraw: function() {
             img("rocket", 550 + 400, 200);
-            if (takeoffProgress > 0) {
-                img("thrust", 580 + 400, 200 + 572);
-                var sz = 100 + Math.random() * 30;
-                c.fillStyle = "rgba(255, 252, 232, 0.7)";
-                c.beginPath();
-                c.arc(600 + 400, 800, sz, 0, 2 * Math.PI, false);
-                c.fill();
-                c.fillStyle = "white";
-                c.beginPath();
-                c.arc(600 + 400, 800, sz / 2, 0, 2 * Math.PI, false);
-                c.fill();
+            img("thrust", 580 + 400, 200 + 572);
+            var sz = 100 + Math.random() * 30;
+            c.fillStyle = "rgba(255, 252, 232, 0.7)";
+            c.beginPath();
+            c.arc(600 + 400, 800, sz, 0, 2 * Math.PI, false);
+            c.fill();
+            c.fillStyle = "white";
+            c.beginPath();
+            c.arc(600 + 400, 800, sz / 2, 0, 2 * Math.PI, false);
+            c.fill();
+            img("tweetbutton", 1100, 450);
+            if (csr && csr.x > 1100 && csr.x < 1100 + 152 && csr.y > 450 && csr.y < 450 + 56) {
+                c.fillStyle = "rgba(255, 255, 255, 0.4)";
+                c.fillRect(1100, 450, 152, 56);
+                if (click) {
+                    window.location.href = "https://twitter.com/intent/tweet?hashtags=MuslimBanProtest&ref_src=twsrc%5Etfw&text=Martian%20Immigration%20Nightmare%2C%20a%20web%20game%20made%20specifically%20for%20Elon%20Musk.&tw_p=tweetbutton&url=https%3A%2F%2Fzarkonnen.itch.io%2Fmartian-immigration-nightmare";
+                }
             }
         }
     },
@@ -390,7 +396,7 @@ var interactions = {
                     phoneBrokenReported = false;
                     takeoff = false;
                     place = places.mainHall;
-                    node = place.interaction;
+                    node = null;
                     textOverride = null;
                     takeoffProgress = 0;
                 }
@@ -1009,11 +1015,13 @@ var interactions = {
 };
 
 var place = places.mainHall;
-var node = place.interaction;
+var node = null;
 var textOverride = null;
 var scale = 1.0;
 var xShift = 0;
 var yShift = 0;
+var clk = null;
+var csr = null;
 
 function tick(ms) {
     prevDirty |= hover != prevHover || takeoffProgress > 0;
@@ -1035,11 +1043,11 @@ function tick(ms) {
     var w = 1500;
     var h = 1125;
     reset();
-    var csr = null
+    csr = null
     if (cursor) {
         csr = {x: (cursor.x - shiftX) / scale, y: (cursor.y - shiftY) / scale};
     }
-    var clk = null
+    clk = null
     if (click) {
         clk = {x: (click.x - shiftX) / scale, y: (click.y - shiftY) / scale};
     }
@@ -1258,7 +1266,7 @@ var imgNames = [
     "hallB", "bQueue", "bDesk", "bElevator",
     "floorC", "cQueue", "cDesk", "cElevator",
     "floorD", "dPhone", "dElevator",
-    "police"
+    "police", "tweetbutton"
 ];
 
 for (var i = 0; i < imgNames.length; i++) {
