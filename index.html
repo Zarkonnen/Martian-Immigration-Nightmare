@@ -58,9 +58,9 @@ var musics = [
     {
         volume: function() {
             if (takeoffProgress > 0) { return 0.15; }
-            if (takeoff) { return 0.15; }
+            if (takeoff) { return 0.32; }
             if (gotoFloorBAgain) { return 0.45; }
-            if (gotoFloorC) { return 0.5; }
+            if (gotoFloorC) { return 0.6; }
             if (gotoFloorB) { return 0.3; }
             return 0.0001;
         },
@@ -118,7 +118,7 @@ var musics = [
     {
         volume: function() {
             if (takeoffProgress > 0) { return 0.25; }
-            if (takeoff) { return 0.3; }
+            if (takeoff) { return 0.25; }
             if (gotoFloorBAgain) { return 0.25; }
             if (gotoFloorC) { return 0.05; }
             if (gotoFloorB) { return 0.01; }
@@ -130,9 +130,9 @@ var musics = [
     {
         volume: function() {
             if (takeoffProgress > 0) { return 0.0000001; }
-            if (takeoff) { return 0.05; }
+            if (takeoff) { return 0.1; }
             if (gotoFloorBAgain) { return 0.0001; }
-            if (gotoFloorC) { return 0.05; }
+            if (gotoFloorC) { return 0.07; }
             if (gotoFloorB) { return 0.01; }
             return 0.0001;
         },
